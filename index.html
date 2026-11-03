@@ -2,7 +2,7 @@
 <html>
     <head>
         <meta charset="utf-8">
-        <title>AR.js - Video + 3D Deer Model</title>
+        <title>AR.js - Scan to Show Quiz</title>
         <!-- A-Frame 本體 -->
         <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
         <!-- AR.js -->
@@ -10,26 +10,116 @@
         <!-- 手勢控制腳本 -->
         <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
         <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
-        
-        <!-- 影片自動播放/暫停控制組件 -->
+
+        <style>
+            /* 選擇題面板樣式：預設隱藏 (display: none) */
+            #quiz-container {
+                display: none; 
+                position: fixed;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 85%;
+                max-width: 400px;
+                background: rgba(0, 0, 0, 0.85);
+                color: #ffffff;
+                padding: 16px;
+                border-radius: 12px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+                font-family: Arial, sans-serif;
+                z-index: 9999999; /* 設為極高層級，確保不會被攝影機畫面遮擋 */
+                text-align: center;
+            }
+
+            .quiz-title {
+                font-size: 16px;
+                font-weight: bold;
+                margin-bottom: 12px;
+                color: #ffd700;
+            }
+
+            .quiz-btn {
+                display: block;
+                width: 100%;
+                padding: 10px 0;
+                margin: 6px 0;
+                background-color: #333;
+                color: white;
+                border: 1px solid #555;
+                border-radius: 6px;
+                font-size: 14px;
+                cursor: pointer;
+            }
+
+            .quiz-btn:active {
+                background-color: #555;
+            }
+
+            #quiz-result {
+                margin-top: 10px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+        </style>
+
         <script>
-            AFRAME.registerComponent('videohandler', {
+            // 註冊 Marker 掃描事件組件
+            AFRAME.registerComponent('marker-listener', {
                 init: function () {
                     var marker = this.el;
-                    this.vid = document.querySelector("#vid");
+                    var vid = document.querySelector("#vid");
+                    var quizContainer = document.querySelector("#quiz-container");
+
+                    // 1. 成功掃描到 Marker
                     marker.addEventListener('markerFound', function () {
-                        this.toggle = true;
-                        this.vid.play();
-                    }.bind(this));
+                        // 播放影片
+                        if (vid) {
+                            vid.play().catch(function(e) { console.log("影片播放需使用者互動", e); });
+                        }
+                        // 顯示選擇題
+                        if (quizContainer) {
+                            quizContainer.style.display = "block";
+                        }
+                    });
+
+                    // 2. 離開 Marker (移開鏡頭)
                     marker.addEventListener('markerLost', function () {
-                        this.toggle = false;
-                        this.vid.pause();
-                    }.bind(this));
-                },
+                        // 暫停影片
+                        if (vid) {
+                            vid.pause();
+                        }
+                        // 隱藏選擇題與答題紀錄
+                        if (quizContainer) {
+                            quizContainer.style.display = "none";
+                            document.getElementById("quiz-result").innerHTML = ""; // 離開時重置答案提示
+                        }
+                    });
+                }
             });
+
+            // 檢查答案函式
+            function checkAnswer(isCorrect) {
+                var resultText = document.getElementById("quiz-result");
+                if (isCorrect) {
+                    resultText.innerHTML = "🎉 答對了！雄鹿的鹿角每年都會脫落重長哦！";
+                    resultText.style.color = "#4CAF50";
+                } else {
+                    resultText.innerHTML = "❌ 答錯囉，再試一次看看！";
+                    resultText.style.color = "#FF5252";
+                }
+            }
         </script>
     </head>
     <body style="margin: 0; overflow: hidden;">
+        <!-- HTML 選擇題面板 -->
+        <div id="quiz-container">
+            <div class="quiz-title">❓ 關於鹿的小知識：公鹿的鹿角會脫落嗎？</div>
+            <button class="quiz-btn" onclick="checkAnswer(true)">A. 會，每年都會脫落並重新生長</button>
+            <button class="quiz-btn" onclick="checkAnswer(false)">B. 不會，角會跟隨一生直到老死</button>
+            <button class="quiz-btn" onclick="checkAnswer(false)">C. 只有受傷時才會脫落</button>
+            <div id="quiz-result"></div>
+        </div>
+
         <a-scene
             vr-mode-ui="enabled: false"
             loading-screen="enabled: false;"
@@ -39,7 +129,6 @@
             gesture-detector
         >
             <a-assets>
-                <!-- 影片資源 -->
                 <video
                     id="vid"
                     src="assets/asset.mp4"
@@ -52,16 +141,15 @@
                     muted
                     playsinline
                 ></video>
-                
-                <!-- 3D 鹿模型資源 (已更新為您的 .glb 檔名) -->
                 <a-asset-item id="deer-model" src="assets/male_deer_animal_3d_model_free.glb"></a-asset-item>
             </a-assets>
 
+            <!-- 在 a-marker 上加入 marker-listener 組件 -->
             <a-marker
                 type="pattern"
                 preset="custom"
                 url="assets/marker.patt"
-                videohandler
+                marker-listener
                 smooth="true"
                 smoothCount="10"
                 smoothTolerance="0.01"
@@ -71,7 +159,6 @@
                 cursor="fuse: false; rayOrigin: mouse;"
                 id="markerA"
             >
-                <!-- 1. 背景/平面影片 -->
                 <a-video
                     src="#vid"
                     scale="1 1 1"
@@ -81,7 +168,6 @@
                     gesture-handler
                 ></a-video>
 
-                <!-- 2. 3D 鹿模型 -->
                 <a-entity
                     id="deer"
                     gltf-model="#deer-model"
